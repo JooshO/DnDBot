@@ -3,7 +3,6 @@ import os
 import random
 import re
 import requests
-import json
 
 from dotenv import load_dotenv
 
@@ -25,21 +24,47 @@ async def on_ready():
              help='Fetches spells. Usage: !spell {spell-name}. Replace any spaces in the spell name with a \'-\'')
 async def get_spell(ctx, spell_name: str):
     retrieved = requests.get('https://www.dnd5eapi.co/api/spells/{0}/'.format(spell_name))
-    spell_data = json.loads(retrieved.json())
+    spell_data = retrieved.json()
     response = spell_data['name']
     response += '\nLevel: {0} | School: {1}\n'.format(spell_data['level'], spell_data['school']['name'])
     response += f'Casting Time: {spell_data["casting_time"]} | ' \
                 f'Range {spell_data["range"]} | Duration {spell_data["duration"]}\n'
+
+    # The components line. This displays the components, then the materials if required
     t_str = str(spell_data["components"])
     t_str = re.sub(r'[^A-Z ,]', '', t_str)
-    response += f'Components: {t_str} | Materials: {spell_data["material"]}\n'
-    response += '------------------------------------------------------------------------------------------------------'
-    response += str(spell_data['desc'])[2:-2] + '\n'
-    response += f'At higher levels: {str(spell_data["higher_level"])[2:-2]}'
+    response += f'Components: {t_str} '
+    if 'M' in spell_data['components']:
+        response += f'| Materials: {spell_data["material"]}\n'
+    else:
+        response += '\n'
 
-    print(retrieved.json())
-    await ctx.send(response)
-    
+    # Output the description
+    response += '----------------------------------------------------------------------------------------------------\n'
+    if len((str(spell_data['desc'])[2:-2] + '\n')) < 1500:
+        for phrase in spell_data['desc']:
+            response += phrase + '\n'
+
+        if 'higher_level' in spell_data:
+            response += f'At higher levels: {str(spell_data["higher_level"])[2:-2]}'
+
+        await ctx.send(response)
+
+    else:
+        await ctx.send(response)
+        response2 = ''
+        for phrase in spell_data['desc']:
+            response2 += phrase + '\n'
+
+        # Only show at higher levels if that exists for the spell
+        if 'higher_level' in spell_data:
+            response2 += f'At higher levels: {str(spell_data["higher_level"])[2:-2]}'
+
+        await ctx.send(response2[0:2000])
+        await ctx.send(response2[2000:-1])
+
+    # await ctx.send(response)
+
 
 # Dice rolling command
 @bot.command(name='roll', help='Rolls dice in the format {num}d{side count}')
